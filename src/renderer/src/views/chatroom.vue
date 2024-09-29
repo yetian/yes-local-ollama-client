@@ -4,26 +4,27 @@
       <span>Chat with my local Ollama</span>
     </div>
     <div class="chat-container">
-      <div
+      <fieldset
         v-for="(message, idx) in messages"
         :key="idx"
-        :class="`message ${message.type === 'query' ? 'right-align-box' : 'left-align-box'}`"
+        :class="`message ${message.type === 'me' ? 'right-align-box' : 'left-align-box'}`"
         :style="`--background: ${getMessageTypeColor(message.type)}`"
       >
-        <div
-          :class="`message-header`"
-          :style="`--background: ${getMessageTypeColor(message.type)}`"
-        >
+        <legend :style="`font-size: 10px; color:${getMessageTypeColor(message.type)}`">
           {{ message.type }}
-        </div>
+        </legend>
         <div
-          v-if="message.type === 'answer'"
+          v-if="message.type === 'ollama'"
           class="message-content"
           v-html="generateMarkdown(message.content)"
         ></div>
         <div v-else class="message-content">{{ message.content }}</div>
-      </div>
-      <div v-if="processing" style="display: flex; align-items: center; gap: 10px; padding: 10px;">
+      </fieldset>
+      <div
+        v-if="processing"
+        ref="loader"
+        style="display: flex; align-items: center; gap: 10px; padding: 10px"
+      >
         <div class="loader"></div>
         <div>Ollama is answering the question, it will take some time...</div>
       </div>
@@ -58,10 +59,14 @@ export default {
   methods: {
     async send() {
       this.messages.push({
-        type: 'query',
+        type: 'me',
         content: this.query
       })
       this.processing = true
+      setTimeout(() => {
+        // scroll to the loader
+        this.$refs.loader.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
       await this.sendQueryAsUser()
       this.processing = false
       this.query = ''
@@ -76,7 +81,7 @@ export default {
 
         if (res) {
           this.messages.push({
-            type: 'answer',
+            type: 'ollama',
             content: res
           })
         } else {
@@ -89,10 +94,10 @@ export default {
     },
     getMessageTypeColor(type) {
       switch (type) {
-        case 'query':
-          return '#D3D7D9'
-        case 'answer':
-          return '#ABE2AB'
+        case 'me':
+          return '#788FA6'
+        case 'ollama':
+          return '#256F3A'
         case 'error':
           return '#FFBBBB'
         default:
@@ -155,7 +160,6 @@ input {
 }
 
 .message-content {
-  white-space: pre-wrap;
   padding: 5px;
 }
 
