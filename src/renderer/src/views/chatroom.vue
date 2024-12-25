@@ -14,19 +14,16 @@
         `"
       >
         <div class="flex-v-top">
-          <div class="message-type" v-if="message.type === 'ollama'"> L </div>
-          <div class="message-content" 
+          <div v-if="message.type === 'ollama'" class="message-type">L</div>
+          <div
+            class="message-content"
             :style="`flex: 1 1 auto; background: ${getMessageBackgroundTypeColor(message.type)}`"
           >
-            <div
-              v-if="message.type === 'ollama'"
-              v-html="generateMarkdown(message.content)"
-            ></div>
+            <div v-if="message.type === 'ollama'" v-html="generateMarkdown(message.content)"></div>
             <div v-else>{{ message.content }}</div>
           </div>
-          <div class="message-type" v-if="message.type === 'me'"> M </div>
+          <div v-if="message.type === 'me'" class="message-type">M</div>
         </div>
-        
       </div>
       <div
         v-if="processing"
@@ -39,16 +36,25 @@
     </div>
     <div class="input-window">
       <input
-        class="rounded"
         ref="input"
         v-model="query"
+        class="rounded"
         type="text"
         style="flex: 2 1 auto"
         :disabled="processing"
         @keypress="(e) => e.key === 'Enter' && send()"
       />
-      <button class="rounded" :disabled="processing || query.trim() === ''" style="flex: 0 1 auto" @click="send()">send</button>
-      <button class="rounded" :disabled="processing" style="flex: 0 1 auto" @click="clear()">clear</button>
+      <button
+        class="rounded"
+        :disabled="processing || query.trim() === ''"
+        style="flex: 0 1 auto"
+        @click="send()"
+      >
+        send
+      </button>
+      <button class="rounded" :disabled="processing" style="flex: 0 1 auto" @click="clear()">
+        clear
+      </button>
     </div>
   </div>
 </template>
@@ -117,23 +123,26 @@ export default {
         const resId = uuidv4()
         console.log(resId)
         window.api.streamFromOllama('http://127.0.0.1:11434', 'llama3.2:1b', query)
-        
-        const currentMessageListener = window.api.onOllamaStreamChunk('ollama-stream-chunk', (chunk) => {
-          // look for the id the message list
-          const message = this.messages.find((m) => m.id === resId)
-          console.log(message)
-          const chunkMessageContent = chunk?.message?.content
-          console.log(chunkMessageContent)
-          if (message) {
-            message.content += chunkMessageContent
-          } else {
-            this.messages.push({
-              type: 'ollama',
-              id: resId,
-              content: chunkMessageContent
-            })
+
+        const currentMessageListener = window.api.onOllamaStreamChunk(
+          'ollama-stream-chunk',
+          (chunk) => {
+            // look for the id the message list
+            const message = this.messages.find((m) => m.id === resId)
+            console.log(message)
+            const chunkMessageContent = chunk?.message?.content
+            console.log(chunkMessageContent)
+            if (message) {
+              message.content += chunkMessageContent
+            } else {
+              this.messages.push({
+                type: 'ollama',
+                id: resId,
+                content: chunkMessageContent
+              })
+            }
           }
-        })
+        )
 
         console.log(currentMessageListener)
 
@@ -148,11 +157,11 @@ export default {
           this.query = ''
           this.focusInput()
           this.messages.push({
-              type: 'ollama',
-              id: resId,
-              content: error,
-              error: true
-            })
+            type: 'ollama',
+            id: resId,
+            content: error,
+            error: true
+          })
         })
       }
     },
@@ -287,7 +296,7 @@ input {
   border-radius: 10px;
   border: 1px solid #ccc;
   background: #fff;
-  padding: 0px 10px ;
+  padding: 0px 10px;
 }
 
 .flex-v-top {
