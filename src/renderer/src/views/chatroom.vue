@@ -64,6 +64,14 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { v4 as uuidv4 } from 'uuid'
 
+marked.use({
+  tokenizer: {
+    heading() {
+      return undefined
+    }
+  }
+})
+
 export default {
   name: 'Chatroom',
   data() {
@@ -121,30 +129,22 @@ export default {
       if (query !== '') {
         this.processing = true
         const resId = uuidv4()
-        console.log(resId)
         window.api.streamFromOllama('http://127.0.0.1:11434', 'llama3.2:1b', query)
 
-        const currentMessageListener = window.api.onOllamaStreamChunk(
-          'ollama-stream-chunk',
-          (chunk) => {
-            // look for the id the message list
-            const message = this.messages.find((m) => m.id === resId)
-            console.log(message)
-            const chunkMessageContent = chunk?.message?.content
-            console.log(chunkMessageContent)
-            if (message) {
-              message.content += chunkMessageContent
-            } else {
-              this.messages.push({
-                type: 'ollama',
-                id: resId,
-                content: chunkMessageContent
-              })
-            }
+        window.api.onOllamaStreamChunk('ollama-stream-chunk', (chunk) => {
+          // look for the id the message list
+          const message = this.messages.find((m) => m.id === resId)
+          const chunkMessageContent = chunk?.message?.content
+          if (message) {
+            message.content += chunkMessageContent
+          } else {
+            this.messages.push({
+              type: 'ollama',
+              id: resId,
+              content: chunkMessageContent
+            })
           }
-        )
-
-        console.log(currentMessageListener)
+        })
 
         window.api.onOllamaStreamChunk('ollama-stream-end', () => {
           this.processing = false
@@ -261,14 +261,14 @@ input {
 }
 
 .right-align-box {
-  width: 80%;
+  max-width: 80%;
   position: relative;
   right: 0;
   margin-left: auto;
 }
 
 .left-align-box {
-  width: 80%;
+  max-width: 80%;
   position: relative;
   left: 0;
   margin-right: auto;
