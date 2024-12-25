@@ -4,22 +4,30 @@
       <span>Chat with my local Ollama</span>
     </div>
     <div class="chat-container">
-      <fieldset
+      <div
         v-for="(message, idx) in messages"
         :key="idx"
         :class="`message ${message.type === 'me' ? 'right-align-box' : 'left-align-box'}`"
-        :style="`--background: ${getMessageTypeColor(message.type)}`"
+        :style="`
+          --background: ${getMessageBackgroundTypeColor(message.type)};
+          --color: ${getMessageTypeColor(message.type)};
+        `"
       >
-        <legend :style="`font-size: 10px; color:${getMessageTypeColor(message.type)}`">
-          {{ message.type }}
-        </legend>
-        <div
-          v-if="message.type === 'ollama'"
-          class="message-content"
-          v-html="generateMarkdown(message.content)"
-        ></div>
-        <div v-else class="message-content">{{ message.content }}</div>
-      </fieldset>
+        <div class="flex-v-top">
+          <div class="message-type" v-if="message.type === 'ollama'"> L </div>
+          <div class="message-content" 
+            :style="`flex: 1 1 auto; background: ${getMessageBackgroundTypeColor(message.type)}`"
+          >
+            <div
+              v-if="message.type === 'ollama'"
+              v-html="generateMarkdown(message.content)"
+            ></div>
+            <div v-else>{{ message.content }}</div>
+          </div>
+          <div class="message-type" v-if="message.type === 'me'"> M </div>
+        </div>
+        
+      </div>
       <div
         v-if="processing"
         ref="loader"
@@ -31,14 +39,16 @@
     </div>
     <div class="input-window">
       <input
+        class="rounded"
+        ref="input"
         v-model="query"
         type="text"
         style="flex: 2 1 auto"
         :disabled="processing"
         @keypress="(e) => e.key === 'Enter' && send()"
       />
-      <button :disabled="processing" style="flex: 1 1 auto" @click="send()">send</button>
-      <button :disabled="processing" style="flex: 0 1 auto" @click="clear()">clear</button>
+      <button class="rounded" :disabled="processing || query.trim() === ''" style="flex: 0 1 auto" @click="send()">send</button>
+      <button class="rounded" :disabled="processing" style="flex: 0 1 auto" @click="clear()">clear</button>
     </div>
   </div>
 </template>
@@ -46,6 +56,7 @@
 <script>
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import { v4 as uuidv4 } from 'uuid'
 
 export default {
   name: 'Chatroom',
@@ -67,12 +78,19 @@ export default {
         // scroll to the loader
         this.$refs.loader.scrollIntoView({ behavior: 'smooth' })
       }, 100)
-      await this.sendQueryAsUser()
-      this.processing = false
-      this.query = ''
+      // await this.sendQueryAsUser()
+      this.streamQueryAsUser()
+      // this.processing = false
+      // this.query = ''
     },
     clear() {
       this.messages = []
+      this.focusInput()
+    },
+    focusInput() {
+      setTimeout(() => {
+        this.$refs.input.focus()
+      }, 200)
     },
     async sendQueryAsUser() {
       const query = this.query.trim()
@@ -92,6 +110,52 @@ export default {
         }
       }
     },
+    streamQueryAsUser() {
+      const query = this.query.trim()
+      if (query !== '') {
+        this.processing = true
+        const resId = uuidv4()
+        console.log(resId)
+        window.api.streamFromOllama('http://127.0.0.1:11434', 'llama3.2:1b', query)
+        
+        const currentMessageListener = window.api.onOllamaStreamChunk('ollama-stream-chunk', (chunk) => {
+          // look for the id the message list
+          const message = this.messages.find((m) => m.id === resId)
+          console.log(message)
+          const chunkMessageContent = chunk?.message?.content
+          console.log(chunkMessageContent)
+          if (message) {
+            message.content += chunkMessageContent
+          } else {
+            this.messages.push({
+              type: 'ollama',
+              id: resId,
+              content: chunkMessageContent
+            })
+          }
+        })
+
+        console.log(currentMessageListener)
+
+        window.api.onOllamaStreamChunk('ollama-stream-end', () => {
+          this.processing = false
+          this.query = ''
+          this.focusInput()
+        })
+
+        window.api.onOllamaStreamChunk('ollama-stream-error', (error) => {
+          this.processing = false
+          this.query = ''
+          this.focusInput()
+          this.messages.push({
+              type: 'ollama',
+              id: resId,
+              content: error,
+              error: true
+            })
+        })
+      }
+    },
     getMessageTypeColor(type) {
       switch (type) {
         case 'me':
@@ -100,6 +164,18 @@ export default {
           return '#256F3A'
         case 'error':
           return '#FFBBBB'
+        default:
+          return 'white'
+      }
+    },
+    getMessageBackgroundTypeColor(type) {
+      switch (type) {
+        case 'me':
+          return '#E9ECF0'
+        case 'ollama':
+          return '#DBE7DE'
+        case 'error':
+          return '#FFF4F4'
         default:
           return 'white'
       }
@@ -124,9 +200,7 @@ export default {
 .message {
   padding: 0px;
   flex-shrink: 0;
-  border: 1px solid var(--background);
   margin: 10px 10px 0px 10px;
-  border-radius: 5px;
 }
 
 .header {
@@ -142,7 +216,7 @@ export default {
   display: flex;
   gap: 10px;
   justify-content: space-between;
-  padding: 10px;
+  padding: 15px 10px 0px 10px;
   border-top: 1px solid #ccc;
 }
 
@@ -155,12 +229,26 @@ input {
   font-size: 10px;
   padding: 5px;
   margin: 0px;
-  background-color: var(--background);
   border-radius: 5px 5px 0px 0px;
 }
 
 .message-content {
-  padding: 5px;
+  background-color: var(--background);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.message-type {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--color);
+  color: var(--background);
+  font-size: 0.9rem;
+  font-weight: bold;
+  height: 2rem;
+  min-width: 2rem;
+  border-radius: 50%;
 }
 
 .right-align-box {
@@ -193,5 +281,18 @@ input {
   100% {
     transform: rotate(360deg);
   }
+}
+
+.rounded {
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  background: #fff;
+  padding: 0px 10px ;
+}
+
+.flex-v-top {
+  display: flex;
+  align-items: top;
+  gap: 10px;
 }
 </style>

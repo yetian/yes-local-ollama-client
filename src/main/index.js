@@ -73,13 +73,17 @@ app.on('window-all-closed', () => {
 
 // In this file you can include the rest of your app"s specific main process
 // code. You can also put them in separate files and require them here.
-const fetchFromOllama = async (endpoint, modelName, query) => {
+const fetchFromOllama = async (endpoint, modelName, query, isStreaming=false) => {
   const ollama = new Ollama({ host: endpoint })
   try {
     const response = await ollama.chat({
       model: modelName,
-      messages: [{ role: 'user', content: query }]
+      messages: [{ role: 'user', content: query }],
+      stream: isStreaming
     })
+    if (isStreaming) {
+      return response
+    }
     return response.message.content
   } catch (err) {
     console.log(err)
@@ -89,4 +93,19 @@ const fetchFromOllama = async (endpoint, modelName, query) => {
 
 ipcMain.handle('fetch-from-ollama', async (event, endpoint, modelName, query) => {
   return await fetchFromOllama(endpoint, modelName, query)
+})
+
+// Here handles the ollama streaming
+ipcMain.on('stream-from-ollama', async (event, endpoint, modelName, query) => {
+  const response = await fetchFromOllama(endpoint, modelName, query, true)
+
+  if (response) {
+    for await (const chunk of response) {
+      event.sender.send('ollama-stream-chunk', chunk)
+    }
+    event.sender.send('ollama-stream-end')
+  } else {
+    event.sender.send('ollama-stream-error', 'Response is undefined')
+  }
+  ipcMain.removeAllListeners('ollama-stream-chunk')
 })

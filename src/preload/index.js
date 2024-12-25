@@ -3,7 +3,12 @@ import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
 const api = {
-  fetchFromOllama: (endpoint, modelName, query) => ipcRenderer.invoke('fetch-from-ollama', endpoint, modelName, query)
+  fetchFromOllama: (endpoint, modelName, query) => ipcRenderer.invoke('fetch-from-ollama', endpoint, modelName, query),
+  streamFromOllama: (endpoint, modelName, query) => ipcRenderer.send('stream-from-ollama', endpoint, modelName, query),
+  onOllamaStreamChunk: (channel, callback) => {
+    ipcRenderer.removeAllListeners(channel)
+    ipcRenderer.on(channel, (event, ...args) => callback(...args))
+  }
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to
